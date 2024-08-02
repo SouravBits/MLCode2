@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 import joblib
 import numpy as np
+import mlflow
+import mlflow.sklearn
 
 app = Flask(__name__)
 
@@ -8,10 +10,12 @@ app = Flask(__name__)
 knn = joblib.load('knn_model.joblib')
 scaler = joblib.load('scaler.joblib')
 
+# Set the tracking URI to the custom MLflow server
+mlflow.set_tracking_uri("http://127.0.0.1:5001")
+
 @app.route('/')
 def home():
     return "Iris Classifier API"
-
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -31,8 +35,13 @@ def predict():
         'prediction': target_names[predicted_class]
     }
 
+    # Log the prediction details to MLflow
+    with mlflow.start_run():
+        mlflow.log_param("input_features", data['features'])
+        mlflow.log_metric("predicted_class", predicted_class)
+        mlflow.sklearn.log_model(knn, "model", input_example=np.array(data['features']).reshape(1, -1))
+    
     return jsonify(response)
-
 
 if __name__ == '__main__':
     app.run(debug=True)
